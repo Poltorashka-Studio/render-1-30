@@ -1,46 +1,34 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const axios = require("axios");
 
 const app = express();
-
-const target = "https://1-30.webflow.io";
-
-// Отключаем прокси для скриптов и ассетов Webflow CDN
-const skipExtensions = [".js", ".css", ".woff", ".woff2", ".ttf", ".svg", ".eot", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
-
-app.use((req, res, next) => {
-  const url = req.url.toLowerCase();
-  const shouldBypass = skipExtensions.some(ext => url.endsWith(ext)) ||
-                        url.includes("webflow.com") ||
-                        url.includes("website-files.com");
-  if (shouldBypass) {
-    res.redirect(target + req.url);
-  } else {
-    next();
-  }
-});
-
-app.use(
-  "/",
-  createProxyMiddleware({
-    target,
-    changeOrigin: true,
-    xfwd: true,
-    onProxyReq(proxyReq, req, res) {
-      proxyReq.setHeader("host", new URL(target).host);
-      proxyReq.setHeader("origin", target);
-      proxyReq.setHeader("referer", target);
-      proxyReq.setHeader("user-agent", req.headers["user-agent"] || "");
-    },
-    onProxyRes(proxyRes) {
-      if (proxyRes.headers["set-cookie"]) {
-        delete proxyRes.headers["set-cookie"];
-      }
-    }
-  })
-);
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Proxy server is running on port ${PORT}`);
+
+const WEBFLOW_SITE = "https://1-30.webflow.io";
+
+app.get("*", async (req, res) => {
+  try {
+    const response = await axios.get(WEBFLOW_SITE + req.url, {
+      headers: {
+        "User-Agent": req.headers["user-agent"] || "",
+        "Referer": WEBFLOW_SITE,
+        "Origin": WEBFLOW_SITE,
+        "Host": new URL(WEBFLOW_SITE).host,
+      },
+    });
+
+    // Отдаём HTML "как есть"
+    let html = response.data;
+
+    // Убираем возможные редиректы или base href (если нужно)
+    html = html.replace(/<base[^>]*>/g, "");
+
+    // Отдаём
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(502).send("Ошибка проксирования Webflow");
+  }
 });
