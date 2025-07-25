@@ -5,10 +5,19 @@ const app = express();
 
 const target = "https://1-30.webflow.io";
 
-// Разрешаем CORS-заголовки (на всякий случай)
+// Отключаем прокси для скриптов и ассетов Webflow CDN
+const skipExtensions = [".js", ".css", ".woff", ".woff2", ".ttf", ".svg", ".eot", ".png", ".jpg", ".jpeg", ".gif", ".webp"];
+
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  next();
+  const url = req.url.toLowerCase();
+  const shouldBypass = skipExtensions.some(ext => url.endsWith(ext)) ||
+                        url.includes("webflow.com") ||
+                        url.includes("website-files.com");
+  if (shouldBypass) {
+    res.redirect(target + req.url);
+  } else {
+    next();
+  }
 });
 
 app.use(
@@ -24,7 +33,6 @@ app.use(
       proxyReq.setHeader("user-agent", req.headers["user-agent"] || "");
     },
     onProxyRes(proxyRes) {
-      // Удаляем потенциально проблемные куки Cloudflare
       if (proxyRes.headers["set-cookie"]) {
         delete proxyRes.headers["set-cookie"];
       }
