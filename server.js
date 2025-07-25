@@ -18,17 +18,17 @@ app.get("*", async (req, res) => {
       },
     });
 
-    // Отдаём HTML "как есть"
     let html = response.data;
-
-    // Убираем возможные редиректы или base href (если нужно)
     html = html.replace(/<base[^>]*>/g, "");
-
-    // Отдаём
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
   } catch (err) {
     console.error(err);
     res.status(502).send("Ошибка проксирования Webflow");
   }
+});
+
+// 👇 ЭТО ОБЯЗАТЕЛЬНО
+app.listen(PORT, () => {
+  console.log(`Proxy server running on port ${PORT}`);
 });
